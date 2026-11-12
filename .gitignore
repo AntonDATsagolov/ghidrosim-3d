@@ -7,3 +7,5 @@ data/projects/
 backend/.gstack/
 frontend/vendor/
 .DS_Store
+docs/screenshots/*.png
+docs/screenshots/*.jpg
