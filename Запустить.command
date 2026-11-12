@@ -10,5 +10,11 @@ if [ ! -x ".venv/bin/python" ]; then
     echo "Не удалось установить зависимости"; read -r -p "Enter…"; exit 1; }
 fi
 
+# Сторонняя библиотека three.js (3D-вид) скачивается при первом запуске
+if [ ! -f "frontend/vendor/three.module.js" ]; then
+  echo "Загружаем three.js…"
+  python3 scripts/fetch_vendor.py || echo "three.js не загружена — 3D-вид будет недоступен"
+fi
+
 echo "Запуск сервера: http://127.0.0.1:8000"
 .venv/bin/python backend/app/cli.py --port 8000
