@@ -1,0 +1,28 @@
+[project]
+name = "gHydroSim3D"
+version = "1.0.0"
+description = "Гидродинамическое моделирование и массоперенос при подземном скважинном выщелачивании урана"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+g-hydro = "app.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
