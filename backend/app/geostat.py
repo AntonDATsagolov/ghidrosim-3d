@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.linalg import cho_factor, cho_solve
+from scipy.linalg import lu_factor, lu_solve
 from scipy.spatial import cKDTree
 
 
@@ -137,20 +137,21 @@ def ordinary_kriging(
     # решается расширенной системой, поэтому спектральной проекции здесь нет.
     dist_pp = _apply_anisotropy(points[:, None, :] - points[None, :, :], aniso)
     K_full = vg.evaluate(dist_pp)
-
     tree = cKDTree(points / aniso)
-    # Для кригинга используем локальную выборку ближайших соседей
+    # Для кригинга используем локальную выборку ближайших соседей.
+    # Порядок выбора фиксирован (устойчивая сортировка по расстоянию) —
+    # так результат воспроизводим и совпадает с портом на JavaScript.
     max_pts = 16
     out = np.empty(targets.shape[0], dtype=float)
     if n <= max_pts:
-        neigh_all = [np.arange(n)] * targets.shape[0]
+        neigh_all = np.tile(np.arange(n), (targets.shape[0], 1))
     else:
-        _, neigh_all = tree.query(targets / aniso, k=max_pts, workers=-1)
-        neigh_all = np.atleast_2d(neigh_all)
+        diff = (targets[:, None, :] - points[None, :, :]) / aniso
+        dist = np.sqrt((diff ** 2).sum(axis=2))
+        neigh_all = np.argsort(dist, axis=1, kind="stable")[:, :max_pts]
 
     for i in range(targets.shape[0]):
         idx = np.atleast_1d(neigh_all[i]).astype(int)
-        idx = np.unique(idx)
         Ksub = K_full[np.ix_(idx, idx)]
         vals = values[idx]
         # Регуляризация диагонали (нуджет) для устойчивости Холецкого
@@ -170,8 +171,10 @@ def ordinary_kriging(
         kvec = vg.evaluate(dist)
         b = np.concatenate([kvec, [1.0]])
         try:
-            c = cho_factor(Kaug, lower=True, check_finite=False)
-            sol = cho_solve(c, b, check_finite=False)
+            lu, piv = lu_factor(Kaug)
+            sol = lu_solve((lu, piv), b)
+            if not np.all(np.isfinite(sol)):
+                raise ValueError('non-finite')
         except Exception:
             sol = np.linalg.lstsq(Kaug, b, rcond=None)[0]
         w = sol[: len(vals)]

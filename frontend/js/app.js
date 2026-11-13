@@ -503,6 +503,24 @@ async function saveProject() {
   }
 }
 
+async function exportCsv() {
+  if (!state.pid) return;
+  const what = window.prompt('Что выгрузить?\n1 — скважины\n2 — свойства пласта\n3 — кривые расчёта', '1');
+  const map = { '1': 'wells', '2': 'properties', '3': 'curves' };
+  const target = map[String(what ?? '1').trim()];
+  if (!target) return;
+  try {
+    const res = await fetch(`/api/projects/${state.pid}/export?what=${target}`);
+    if (!res.ok) throw new Error('ошибка выгрузки');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${target}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('Файл выгружен');
+  } catch (e) { toast(`Ошибка: ${e.message}`, 'error'); }
+}
+
 async function openProject() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -650,6 +668,7 @@ async function init() {
   $('#btnRun').addEventListener('click', runCalc);
   $('#btnSave').addEventListener('click', saveProject);
   $('#btnOpen').addEventListener('click', openProject);
+  $('#btnExport')?.addEventListener('click', exportCsv);
 
   // Первичная загрузка демо-проекта
   await loadDemo();

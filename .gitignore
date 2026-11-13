@@ -9,3 +9,4 @@ frontend/vendor/
 .DS_Store
 docs/screenshots/*.png
 docs/screenshots/*.jpg
+dist/ghidrosim3d-offline.html

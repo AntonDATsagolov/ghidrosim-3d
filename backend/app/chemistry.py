@@ -393,7 +393,6 @@ def simulate_3d(
         # ограничение, чтобы доля не ушла в ноль за шаг
         max_uptake = u_rel * u_rel0 * ORE_DENSITY * (1 - phi) * ore_frac / dt
         uptake = np.minimum(uptake, np.maximum(max_uptake, 0.0))
-
         d_a += kin.acid_rate(uptake, reactions) * dt * pore_vol
         d_u += kin.uranium_rate(uptake) * dt * pore_vol
         d_fe += kin.fe3_rate(uptake, reactions) * dt * pore_vol
@@ -440,7 +439,9 @@ def simulate_3d(
         # расход кислоты: закачка минус вынос
         for c, info in inj_cells.items():
             inj_vol += info["rate"] * dt
-        cum_acid += float(np.sum(np.maximum(kin.acid_rate(uptake, reactions), 0.0) * dt * pore_vol)) / 1000.0
+        # расход кислоты на реакции, кг: ACID_PER_U [кг/кг] × uptake [кг/м3/сут]
+        # × объём ячейки [м3] × шаг [сут]
+        cum_acid += float(np.sum(ACID_PER_U * uptake * grid.cell_volume * dt))
 
         # --- источники в закачивающих ячейках ---
         for c, info in inj_cells.items():

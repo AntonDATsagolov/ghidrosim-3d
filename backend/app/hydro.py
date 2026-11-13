@@ -175,10 +175,6 @@ def build_system(
             if tot_w > 0:
                 # уменьшаем источник в приграничных ячейках на величину избытка
                 rhs = rhs - net * (weight / tot_w)
-        # Минимальная регуляризация для фиксации отсчёта напора
-        eps = max(abs(diag).max(), 1.0) * 1e-9
-        diag = diag + eps
-        meta["neumann_regularization"] = eps
 
     rows.append(np.arange(n)); cols.append(np.arange(n)); data.append(diag)
     A = sp.coo_matrix(
@@ -188,6 +184,18 @@ def build_system(
 
     meta["has_dirichlet"] = has_dirichlet
     meta["diag"] = diag
+    if not has_dirichlet:
+        # Устранение вырожденности по константе: система A·x = b имеет
+        # бесконечное семейство решений (x + const). Вводим условие
+        # sum(x) = 0 через множитель Лагранжа:
+        #     [ A   u ] [x]   [b]
+        #     [ uᵀ  0 ] [λ] = [0],   u = 1/√n
+        # Решение этой расширенной системы совпадает с решением
+        # A·x = b при нулевом среднем (сдвиг напора не влияет на потоки).
+        alpha = max(abs(diag).max(), 1.0) * 0.1
+        u = sp.csr_matrix(np.ones((n, 1)) / np.sqrt(n))
+        meta["A_ext"] = sp.bmat([[A, u], [u.T, None]], format="csc")
+        meta["alpha"] = alpha
     return A, rhs, meta
 
 
@@ -270,8 +278,14 @@ def solve(
 
     A, rhs, meta = build_system(grid, k, sources, bc_faces, bc_heads, kv_ratio)
     try:
-        head = spla.spsolve(A.tocsc(), rhs)
-        solver = "spsolve"
+        if "A_ext" in meta:
+            # Чистый Нейман: расширенная система с условием sum(x) = 0
+            sol = spla.spsolve(meta["A_ext"], np.concatenate([rhs, [0.0]]))
+            head = np.asarray(sol[:grid.n], dtype=float)
+            solver = "spsolve+lagrange"
+        else:
+            head = spla.spsolve(A.tocsc(), rhs)
+            solver = "spsolve"
         if not np.all(np.isfinite(head)):
             raise RuntimeError("non-finite")
     except Exception:
